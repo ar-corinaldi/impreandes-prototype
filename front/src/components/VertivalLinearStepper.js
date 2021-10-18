@@ -9,6 +9,7 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import CryptoJS from "crypto-js";
 import CircularProgress from "@mui/material/CircularProgress";
+import axios from "axios";
 
 const encrypt = (text) => {
   const cipher = CryptoJS.AES.encrypt(text, "top secret");
@@ -53,51 +54,50 @@ const downloadFile = (results, setIsLoading) => {
 const onSubmitData = async (file, publicKey, setter, setIsLoading) => {
   try {
     setIsLoading(true);
-    const len = file.size;
-    const chunkSize = 1000; //bytes
-    console.log({ len });
-    let offset = 0;
-    const total = Math.ceil(len / chunkSize);
-    // console.log(file);
-    const arr = [];
-    const buffer = await file.arrayBuffer();
-    const data = new Uint8Array(buffer);
-    console.log(new TextDecoder().decode(data));
-    while (offset < len) {
-      const index = offset / chunkSize;
-      const end = Math.min(offset + chunkSize, len);
-      console.log(offset, end)
-      const slicedFile = file.slice(offset, end);
-      const formData = new FormData();
-      formData.append("myFile", slicedFile, slicedFile.name);
-      const buffer = await slicedFile.arrayBuffer();
-      const data = new Uint8Array(buffer);
-      const encrypted = encrypt(new TextDecoder().decode(data));
-      const body = {
-        file: encrypted,
-        name: file.name,
-      };
+    // const arr = [];
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await axios.post("/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      }
+    });
+    console.log(res)
+    // console.log(new TextDecoder().decode(data));
+    // while (offset < len) {
+    //   const index = offset / chunkSize;
+    //   const end = Math.min(offset + chunkSize, len);
+    //   console.log(offset, end)
+    //   const slicedFile = file.slice(offset, end);
+
+    //   const buffer = await slicedFile.arrayBuffer();
+    //   const data = new Uint8Array(buffer);
+    //   const encrypted = encrypt(new TextDecoder().decode(data));
+    //   const body = {
+    //     file: encrypted,
+    //     name: file.name,
+    //   };
 
 
-      const res = await fetch(`/receiveQuote?index=${index}&length=${total}`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      const obj = await res.json();
-      arr.push(obj.message);
+    //   const res = await fetch(`/receiveQuote?index=${index}&length=${total}`, {
+    //     method: "POST",
+    //     headers: {
+    //       Accept: "multipart/form-data",
+    //       "Content-Type": "multipart/form-data",
+    //     },
+    //     body: JSON.stringify(body),
+    //   });
+    //   const obj = await res.json();
+    //   arr.push(obj.message);
 
-      offset += chunkSize;
-    }
-    let results = "";
-    for (let message of arr) {
-      results += message;
-    }
-    console.log(results);
-    setter(results);
+    //   offset += chunkSize;
+    // }
+    // let results = "";
+    // for (let message of arr) {
+    //   results += message;
+    // }
+    // console.log(results);
+    // setter(results);
   } finally {
     setTimeout(() => setIsLoading(false), 1000);
   }

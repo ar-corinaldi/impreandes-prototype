@@ -2,6 +2,22 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 const CryptoJS = require("crypto-js");
+const path = require("path");
+const { spawn } = require("child_process");
+const CONFIG = require("../config")
+const EventEmitter = require("events")
+const emitter = new EventEmitter()
+emitter.on('transfer_file', (file, res) => {
+  const scp = spawn("scp", ["-i", CONFIG.pem, CONFIG.fileFrom(file.name), `${CONFIG.ec2_instance}:${CONFIG.fileTo}`]);
+
+  scp.on("close", code => {
+    console.log(`child process exited with code ${code}`);
+    if (code === 0) {
+      res.status(200).json({ message: "success!" })
+    }
+  });
+
+})
 const options = {
   modulusLength: 2048,
   publicKeyEncoding: {
@@ -45,6 +61,24 @@ router.post("/receiveQuote", (req, res) => {
     return res.status(500).json({ message: e });
   }
 });
+
+router.post("/upload", (req, res) => {
+  if (req.files === null) {
+    return res.status(400).json({ message: 'No file' });
+  }
+  const file = req.files.file;
+  console.log(file.name)
+  const dir = path.join(__dirname, `../file-server/${file.name}`);
+  file.mv(dir, err => {
+    if (!err) return
+    return res.status(500).json({ message: err });
+  })
+
+  emitter.emit('transfer_file', file, res)
+
+  return res.status(200).json({ fileName: file.name, filePath: dir })
+
+})
 
 const decrypt = (text) => {
   const decipher = CryptoJS.AES.decrypt(text, "top secret");
