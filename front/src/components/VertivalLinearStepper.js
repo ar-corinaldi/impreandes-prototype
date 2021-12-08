@@ -9,13 +9,7 @@ import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import CryptoJS from "crypto-js";
 import CircularProgress from "@mui/material/CircularProgress";
-import axios from "axios";
-
-const encrypt = (text) => {
-  const cipher = CryptoJS.AES.encrypt(text, "top secret");
-  const cipherStr = cipher.toString();
-  return cipherStr;
-};
+import { rsaEncriptionCompleteForString } from "../utils/uploadFile";
 
 const getPublicKeys = async (setter, setIsLoading) => {
   try {
@@ -31,75 +25,80 @@ const getPublicKeys = async (setter, setIsLoading) => {
   }
 };
 
-const downloadFile = (results, setIsLoading) => {
+const onSubmitData = async (file, publicKey, setter, setIsLoading) => {
   try {
     setIsLoading(true);
-    console.log(results)
-    const dataView = new DataView(new TextEncoder().encode(results).buffer);
-    const blob = new Blob([dataView], { type: "application/sla" });
-    const downloadURL = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = downloadURL;
-    a.download = "LlaveroSenecaLogo.stl";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () {
-      return window.URL.revokeObjectURL(downloadURL);
-    }, 1000);
+    rsaEncriptionCompleteForString(publicKey, file);
   } finally {
     setTimeout(() => setIsLoading(false), 1000);
   }
 };
 
-const onSubmitData = async (file, publicKey, setter, setIsLoading) => {
+const onSendToSlicer = async (setIsLoading) => {
   try {
     setIsLoading(true);
-    // const arr = [];
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await axios.post("/upload", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      }
-    });
-    console.log(res)
-    // console.log(new TextDecoder().decode(data));
-    // while (offset < len) {
-    //   const index = offset / chunkSize;
-    //   const end = Math.min(offset + chunkSize, len);
-    //   console.log(offset, end)
-    //   const slicedFile = file.slice(offset, end);
-
-    //   const buffer = await slicedFile.arrayBuffer();
-    //   const data = new Uint8Array(buffer);
-    //   const encrypted = encrypt(new TextDecoder().decode(data));
-    //   const body = {
-    //     file: encrypted,
-    //     name: file.name,
-    //   };
-
-
-    //   const res = await fetch(`/receiveQuote?index=${index}&length=${total}`, {
-    //     method: "POST",
-    //     headers: {
-    //       Accept: "multipart/form-data",
-    //       "Content-Type": "multipart/form-data",
-    //     },
-    //     body: JSON.stringify(body),
-    //   });
-    //   const obj = await res.json();
-    //   arr.push(obj.message);
-
-    //   offset += chunkSize;
-    // }
-    // let results = "";
-    // for (let message of arr) {
-    //   results += message;
-    // }
-    // console.log(results);
-    // setter(results);
+    const res = await fetch("/decryptAndSendToSlicer");
+    const data = await res.json();
+    console.log(data);
+  } catch (e) {
+    console.error(e);
   } finally {
-    setTimeout(() => setIsLoading(false), 1000);
+    setIsLoading(false);
+  }
+};
+
+const verificaEstimacionTiempo = async (setIsLoading) => {
+  try {
+    setIsLoading(true);
+    const res = await fetch("/getTimerFile");
+    const data = await res.json();
+    console.log(data);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const darCotizacion = async (setIsLoading, setter, setterTime) => {
+  try {
+    setIsLoading(true);
+    const res = await fetch("/getQuotation");
+    const data = await res.json();
+    setter(data.quotation);
+    setterTime(data.time);
+    console.log(data);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const enviarAImpresora = async (setIsLoading, file) => {
+  try {
+    setIsLoading(true);
+    const myHeaders = new Headers();
+    myHeaders.append(
+      "Authorization",
+      "Bearer DCB6FF9B7D1948D99494F67C310D1E59"
+    );
+
+    const formdata = new FormData();
+    formdata.append("file", file, file.name);
+    const requestOptions = {
+      method: "POST",
+      headers: myHeaders,
+      body: formdata,
+      redirect: "follow",
+    };
+    const res = await fetch("/sentToPrinter", requestOptions);
+    const data = await res.json();
+    console.log(data);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setIsLoading(false);
   }
 };
 
@@ -123,8 +122,7 @@ const steps = [
     },
   },
   {
-    label:
-      "Encripta con llave publica y manda el archivo a la impresora que desea cotizar",
+    label: "Encripta con llave publica y manda el archivo al servidor",
     description: (data, publicKeys, setter, setIsLoading) => {
       return (
         <div>
@@ -149,12 +147,78 @@ const steps = [
     },
   },
   {
-    label: "Descarga el archivo desencriptado",
-    description: (results, setIsLoading) => (
-      <button onClick={() => downloadFile(results, setIsLoading)}>
-        Descargar
-      </button>
-    ),
+    label: "Desencripta el servidor con llave privada y manda al Slicer",
+    description: (setIsLoading) => {
+      return (
+        <div>
+          Enviar archivo desenciptado al Slicer
+          <button onClick={() => onSendToSlicer(setIsLoading)}>Enviar</button>
+        </div>
+      );
+    },
+  },
+  {
+    label: "Verifica si esta la estimacion del tiempo",
+    description: (setIsLoading) => {
+      return (
+        <div>
+          <button onClick={() => verificaEstimacionTiempo(setIsLoading)}>
+            Verifica
+          </button>
+        </div>
+      );
+    },
+  },
+  {
+    label: "Dar cotizacion",
+    description: (setIsLoading, setter, value, setterTime, time) => {
+      return (
+        <div>
+          <button
+            onClick={() => darCotizacion(setIsLoading, setter, setterTime)}
+          >
+            Cotizar
+          </button>
+          <div>
+            {parseInt(value).toLocaleString("en-US", {
+              style: "currency",
+              currency: "USD",
+            })}
+          </div>
+          <div>Time in seconds: {time}</div>
+        </div>
+      );
+    },
+  },
+  {
+    label: "Enviar archivo a impresora",
+    description: (setIsLoading, gCode, setGCode) => {
+      return (
+        <div>
+          <input
+            type="file"
+            onChange={(event) => setGCode(event.target.files[0])}
+          />
+          <button onClick={() => enviarAImpresora(setIsLoading, gCode)}>
+            Enviar a impresora
+          </button>
+        </div>
+      );
+    },
+  },
+  {
+    label: "Imprimir en impresora",
+    description: (setIsLoading, setter, value, setterTime, time) => {
+      return (
+        <div>
+          <button
+            onClick={() => darCotizacion(setIsLoading, setter, setterTime)}
+          >
+            Imprimir
+          </button>
+        </div>
+      );
+    },
   },
 ];
 
@@ -164,6 +228,9 @@ export default function VerticalLinearStepper() {
   const [publicKeys, setPublicKeys] = React.useState({});
   const [resultedData, setResultedData] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
+  const [cotizacion, setCotizacion] = React.useState(0);
+  const [time, setTime] = React.useState(0);
+  const [gCode, setGCode] = React.useState(null);
 
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -185,7 +252,7 @@ export default function VerticalLinearStepper() {
             <StepLabel
               optional={
                 index === 2 ? (
-                  <Typography variant="caption">Ultimo paso</Typography>
+                  <Typography constiant="caption">Ultimo paso</Typography>
                 ) : null
               }
             >
@@ -201,14 +268,24 @@ export default function VerticalLinearStepper() {
                   setResultedData,
                   setIsLoading
                 )}
-              {index === 2 && step.description(resultedData, setIsLoading)}
+              {index === 2 && step.description(setIsLoading)}
+              {index === 3 && step.description(setIsLoading)}
+              {index === 4 &&
+                step.description(
+                  setIsLoading,
+                  setCotizacion,
+                  cotizacion,
+                  setTime,
+                  time
+                )}
+              {index === 5 && step.description(setIsLoading, gCode, setGCode)}
               <Box sx={{ mb: 2 }}>
                 {isLoading ? (
                   <CircularProgress />
                 ) : (
                   <div>
                     <Button
-                      variant="contained"
+                      constiant="contained"
                       onClick={handleNext}
                       sx={{ mt: 1, mr: 1 }}
                     >
