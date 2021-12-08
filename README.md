@@ -1,3 +1,6 @@
+# impreandes-prototype
+This is the prototype of Impreandes3D that contains asymetric file encryption, uses a slic3r and sends to Octoprint via API the file 
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
