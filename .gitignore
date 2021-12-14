@@ -5,6 +5,7 @@
 /front/node_modules
 /back/node_modules
 /back/file-server
+/back/timer
 /.pnp
 .pnp.js
 
@@ -24,3 +25,5 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+/.vscode
